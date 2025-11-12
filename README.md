@@ -1,2 +1,5 @@
 # HSE-DL_for_NLP
-Completed homework assignments for the "Deep Learning for Natural Language Processing" course at HSE University
+
+В репозитории собраны мои проекты и выполненные домашние задания по курсу "Глубинное обучение для текстовых данных" (НИУ ВШЭ). 
+
+Репозиторий курса от преподавателя: [link](https://github.com/ashaba1in/hse-nlp.git)
