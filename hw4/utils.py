@@ -11,7 +11,7 @@ def get_tokenizer():
 
     return tokenizer
 
-def get_dataloaders(tokenizer, dataset_name='Anthropic/hh-rlhf', train_len=5000, val_len=500):
+def get_dataloaders(dataset_name='Anthropic/hh-rlhf', train_len=5000, val_len=500):
     batch_size = 32
     train_dataset = load_dataset(dataset_name, data_dir="harmless-base", split=f'train[:{train_len}]')
     val_dataset = load_dataset(dataset_name, data_dir="harmless-base", split=f'train[{train_len}:{train_len + val_len}]')
