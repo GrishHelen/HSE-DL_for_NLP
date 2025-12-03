@@ -1,10 +1,8 @@
-
-from time import time_ns
 import timeit
 import numpy as np
 import matplotlib.pyplot as plt
 
-from utils import LSHDatabase
+from vectorized_db import LSHDatabase
 
 
 def test_lsh_2d(num_points=5000, num_results=100, L=10, k=7, batch_size=64):

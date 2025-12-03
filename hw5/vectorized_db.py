@@ -1,6 +1,10 @@
 # your code here
 
 import numpy as np
+from typing import List
+import torch
+import torch.nn.functional as F
+from transformers import AutoTokenizer, AutoModel
 
 class LSHDatabase:
     def __init__(self, dim: int, k: int = 6, L: int = 10) -> None:
@@ -159,3 +163,37 @@ class RecursiveTextSplitter:
         new_text = [''.join(text[i:self.chunk_size]) for i in range(0, len(text), step)]
         
         return new_text
+
+
+class Embedder:
+    def __init__(self, emb_model_name, device=None):
+        self.device = torch.device(device) if device else ('cuda' if torch.cuda.is_available() else 'cpu')
+        self.embedding_dim = 1024
+
+        self.tokenizer = AutoTokenizer.from_pretrained(emb_model_name)
+        self.model = AutoModel.from_pretrained(emb_model_name).to(self.device)
+        self.model.eval()
+        
+    def average_pool(self, last_hidden_states: torch.Tensor, 
+                     attention_mask: torch.Tensor) -> torch.Tensor:
+        last_hidden = last_hidden_states.masked_fill(~attention_mask[..., None].bool(), 0.0)
+        return last_hidden.sum(dim=1) / attention_mask.sum(dim=1)[..., None]
+    
+    def encode(self, texts: List[str]):
+        prefixed_texts = [f"query: {text}" for text in texts]
+        
+        batch_dict = self.tokenizer(
+            prefixed_texts,
+            max_length=512,
+            padding=True,
+            truncation=True,
+            return_tensors='pt'
+        ).to(self.device)
+        
+        with torch.no_grad():
+            outputs = self.model(**batch_dict)
+            embeddings = self.average_pool(outputs.last_hidden_state, batch_dict['attention_mask'])
+            embeddings = F.normalize(embeddings, p=2, dim=1)
+            scores = (embeddings[:2] @ embeddings[2:].T) * 100
+        
+        return embeddings.cpu().numpy()
