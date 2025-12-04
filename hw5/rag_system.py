@@ -6,6 +6,18 @@ from transformers import AutoModelForCausalLM, AutoTokenizer
 
 from vectorized_db import Embedder
 
+def get_category(text):
+    if any(word in text for word in ['суп', 'борщ', 'щи', 'солянка']):
+        return 'суп'
+    elif any(word in text for word in ['салат', 'закуска']):
+        return 'салат'
+    elif any(word in text for word in ['торт', 'десерт', 'печенье', 'пирог']):
+        return 'десерт'
+    elif any(word in text for word in ['второе', 'гарнир', 'мясо', 'рыба', 'курица']):
+        return 'основное блюдо'
+    elif any(word in text for word in ['блины', 'оладьи', 'выпечка', 'булка']):
+        return 'выпечка'
+    return ''
 
 class RecipeRAGSystem:
     def __init__(self, dataset, db_file, emb_model_name, gen_model_name):
@@ -52,27 +64,17 @@ class RecipeRAGSystem:
         return list(retrieved_recipes.values())
 
     def parse_recipe(self, recipe_id):
+        name = components['name'][recipe_id]
+        instructions = self.dataset['text'][recipe_id]
+        all_text = name + '\n' + instructions
+        
         components = {
             'recipe_id': recipe_id,
-            'name': self.dataset['name'][recipe_id],
+            'name': name,
             'ingredients': self.dataset['ingredients'][recipe_id][1:-1].replace("'", ""),
-            'instructions': self.dataset['text'][recipe_id],
-            'category': ''
+            'instructions': instructions,
+            'category': get_category(all_text.lower())
         }
-
-        all_text = components['name'] + '\n' + components['instructions']
-
-        all_text = all_text.lower()
-        if any(word in all_text for word in ['суп', 'борщ', 'щи', 'солянка']):
-            components['category'] = 'суп'
-        elif any(word in all_text for word in ['салат', 'закуска']):
-            components['category'] = 'салат'
-        elif any(word in all_text for word in ['торт', 'десерт', 'печенье', 'пирог']):
-            components['category'] = 'десерт'
-        elif any(word in all_text for word in ['второе', 'гарнир', 'мясо', 'рыба', 'курица']):
-            components['category'] = 'основное блюдо'
-        elif any(word in all_text for word in ['блины', 'оладьи', 'выпечка', 'булка']):
-            components['category'] = 'выпечка'
 
         return components
 
@@ -82,8 +84,9 @@ class RecipeRAGSystem:
         """
 
         for i, recipe in enumerate(retrieved_recipes):
-            prompt += f"Рецепт {i + 1}:\n"
-            prompt += f"Релевантность: {recipe['relevance_score']}"
+            prompt += f"Пример {i + 1}:\n"
+            if recipe['relevance_score'] is not None:
+                prompt += f"Релевантность: {recipe['relevance_score']}"
 
             prompt += f"Название блюда: {recipe['name']}\n"
 
@@ -91,7 +94,7 @@ class RecipeRAGSystem:
                 prompt += f"Категория: {recipe['category']}\n"
 
             prompt += f"Ингредиенты: {recipe['ingredients']}\n"
-            prompt += f"Приготовление: {recipe['instructions']}\n\n"
+            prompt += f"Рецепт: {recipe['instructions']}\n\n"
 
         return prompt
 
@@ -99,10 +102,13 @@ class RecipeRAGSystem:
         messages = [
             {"role": "system",
              "content": """Ты - кулинарный помощник, который пишет рецепты блюд.
-             Используй ТОЛЬКО информацию из предоставленных фрагментов рецептов.
-             Для блюда, которое указал пользователь, пиши список ингредиентов и рецепт с пошаговой инструкцией по приготовлению блюда.
-             Список ингредиентов должен быть небольшим, а рецепт - точным и информативным, не пиши лишнего.
+             Тебе предоставлено несколько примеров с рецептами похожих блюд и их релевантностью.
+             Используй ТОЛЬКО информацию из предоставленных примеров рецептов. 
              Релевантность рецептов в примерах оценена в 10-балльной шкале (чем больше, тем лучше).
+             Для блюда, которое указал пользователь, пиши список ингредиентов и рецепт с пошаговой инструкцией по приготовлению блюда.
+             Список ингредиентов должен быть небольшим, а рецепт - точным и информативным. 
+             Не пиши лишнего, твой ответ должен содержать только список ингредиентов и инструкцию по приготовлению указанного блюда. 
+             
              """
              },
             {"role": "system", "content": recipes_prompt},
@@ -126,16 +132,24 @@ class RecipeRAGSystem:
 
         return response
 
-    def answer_query(self, query, top_k_retrieve=5, print_metainfo=False):
+    def answer_query(self, query, top_k_retrieve=5, rel_threshold=0, print_metainfo=False, use_web=False):
         if print_metainfo:
             print("\n1. Поиск релевантных фрагментов...")
         retrieved_recipes = self.retrieve_relevant_recipes(query, top_k=top_k_retrieve)
+        retrieved_recipes = list(filter(lambda item: item['relevance_score'] >= rel_threshold))
 
         if print_metainfo:
             print(f"   Найдено {len(retrieved_recipes)} релевантных фрагментов:")
             for i, chunk in enumerate(retrieved_recipes):
                 print(
                     f"   {i + 1}. (№{chunk['recipe_id']}) Оценка: {chunk['relevance_score']:.2f} {chunk.get('name', 'Без названия')}")
+
+        if use_web:
+            # TODO
+            web_recipes = []  # TODO
+            web_recipes = web_recipes[:top_k_retrieve - len(retrieved_recipes)]
+            
+            pass
 
         if print_metainfo:
             print("\n2. Создание промпта с фрагментами рецептов...")
