@@ -1,5 +1,6 @@
 import timeit
 import numpy as np
+import torch
 import matplotlib.pyplot as plt
 
 from vectorized_db import LSHDatabase
@@ -11,6 +12,7 @@ def test_lsh_2d(num_points=5000, num_results=100, L=10, k=7, batch_size=64):
     lsh_db = LSHDatabase(dim, L, k)
 
     np.random.seed(42)
+    torch.manual_seed(42)
     points = np.random.uniform(low=-10., high=10., size=(num_points, 2))
 
     for i in range(0, len(points), batch_size):
@@ -76,6 +78,8 @@ def test_lsh_2d(num_points=5000, num_results=100, L=10, k=7, batch_size=64):
 
 def test_search(database, embedder, test_queries, dataset, num_results=3, print_recipe=True):
     for i, query in enumerate(test_queries):
+        np.random.seed(42)
+        torch.manual_seed(42)
         print(f'Запрос {i + 1}:')
         print(query)
         query_embedding = embedder.encode([query])[0]
@@ -100,20 +104,23 @@ def test_search(database, embedder, test_queries, dataset, num_results=3, print_
         print()
 
 
-def test_rag_system(dataset, db_file, emb_model_name, llm_model_name, test_queries):
-    print("Инициализация RAG системы для рецептов...")
+def test_rag_system(dataset, db_file, emb_model_name, llm_model_name, test_queries,
+                    top_k_retrieve=5, rel_threshold=0, print_metainfo=False, use_web=False):
+    print("Инициализация RAG системы для рецептов")
     rag_system = RecipeRAGSystem(dataset, db_file, emb_model_name, llm_model_name)
 
-    print("ДЕМОНСТРАЦИЯ RAG СИСТЕМЫ ДЛЯ РЕЦЕПТОВ")
-
     for i, query in enumerate(test_queries):
+        np.random.seed(42)
+        torch.manual_seed(42)
         print(f"\n{'=' * 60}")
         print(f"Пример {i + 1}/{len(test_queries)}")
         print(f"Запрос: {query}")
 
         result = rag_system.answer_query(
             query=query,
-            top_k_retrieve=5,
-            print_metainfo=True
+            top_k_retrieve=top_k_retrieve,
+            rel_threshold=rel_threshold,
+            print_metainfo=print_metainfo,
+            use_web=use_web,
         )
         print(result)
