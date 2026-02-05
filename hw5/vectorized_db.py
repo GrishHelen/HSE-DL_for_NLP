@@ -82,7 +82,7 @@ class LSHDatabase:
                use_lsh: bool = True, return_indices: bool = False) -> np.ndarray:
 
         if self.vectors is None:
-            return []
+            return np.asarray([])
 
         if use_lsh:
             cand_idxs = self._lsh_candidates(query)
