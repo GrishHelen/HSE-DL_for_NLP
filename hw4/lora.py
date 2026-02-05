@@ -1,10 +1,10 @@
-import torch
-from torch import Tensor
-import torch.nn as nn
-import torch.nn.functional as F
-from transformers import AutoModelForCausalLM
 import numpy as np
 import time
+import torch
+import torch.nn as nn
+import torch.nn.functional as F
+from torch import Tensor
+from transformers import AutoModelForCausalLM
 
 
 class LoRALayer(nn.Module):
@@ -41,6 +41,7 @@ def get_base_model():
     model = AutoModelForCausalLM.from_pretrained("EleutherAI/pythia-1.4b")
     return model
 
+
 def substitute_layers(root, lora_rank):
     for name, module in root.named_children():
         if isinstance(module, nn.Linear):
@@ -48,17 +49,20 @@ def substitute_layers(root, lora_rank):
         elif len(list(module.children())) > 0:
             substitute_layers(module, lora_rank)
 
+
 def apply_lora_to_gpt2(model: nn.Module, lora_rank: int):
     for name, param in model.named_parameters():
         param.requires_grad = False
     substitute_layers(model, lora_rank)
     return model
 
+
 def get_lora_model(lora_rank: int = 4):
     base_model = get_base_model()
     with_lora_model = apply_lora_to_gpt2(base_model, lora_rank)
 
     return with_lora_model
+
 
 def train_model_exp(model, tokenizer, train_loader, val_loader, n_epochs=1, max_length=512):
     device = torch.device('cuda' if torch.cuda.is_available() else 'cpu')
@@ -88,7 +92,7 @@ def train_model_exp(model, tokenizer, train_loader, val_loader, n_epochs=1, max_
             loss.backward()
             opt.step()
             opt.zero_grad()
-            print(f'iter {i+1}/{n_steps};  train loss: {loss.item()}')
+            print(f'iter {i + 1}/{n_steps};  train loss: {loss.item()}')
 
         print('Epoch train loss:', np.mean(losses))
         print()
@@ -104,6 +108,7 @@ def train_model_exp(model, tokenizer, train_loader, val_loader, n_epochs=1, max_
     print(f'memory: {memory}')
 
     return model
+
 
 @torch.no_grad()
 def eval_model_exp(model, tokenizer, val_loader, max_length=512):
@@ -122,4 +127,3 @@ def eval_model_exp(model, tokenizer, val_loader, max_length=512):
         losses.append(loss.item())
 
     print("Val loss:", np.mean(losses))
-
